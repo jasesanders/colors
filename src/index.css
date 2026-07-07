@@ -760,6 +760,16 @@ pre {
   transform: scale(0.96);
 }
 
+/* Gradient border via layered backgrounds — works with border-radius,
+   unlike border-image. The padding-box layer paints the surface color
+   over the middle, leaving only the border-box ring showing the gradient. */
+.btn-follow--gradient {
+  border-color: transparent;
+  background-image: linear-gradient(var(--btn-surface), var(--btn-surface)), var(--btn-gradient);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
 .btn-secondary {
   display: flex;
   align-items: center;

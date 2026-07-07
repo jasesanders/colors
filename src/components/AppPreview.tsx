@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { accessibleAccentOnSurface, type GeneratedTokens } from '../color/utils'
+import { accessibleAccentOnSurface, type ColorStyle, type GeneratedTokens } from '../color/utils'
 
 interface Props {
   tokens: GeneratedTokens
+  colorStyle: ColorStyle
+  onColorStyleChange: (style: ColorStyle) => void
 }
 
 function PhonePreview({
@@ -13,6 +15,9 @@ function PhonePreview({
   filledAccent,
   filledOnAccent,
   textTarget,
+  accentGradientCss,
+  softGradientCss,
+  filledGradientCss,
 }: {
   mode: 'light' | 'dark'
   accent: string
@@ -21,6 +26,9 @@ function PhonePreview({
   filledAccent: string
   filledOnAccent: string
   textTarget: number
+  accentGradientCss?: string
+  softGradientCss?: string
+  filledGradientCss?: string
 }) {
   const [favorited, setFavorited] = useState(false)
   const [following, setFollowing] = useState(false)
@@ -152,6 +160,7 @@ function PhonePreview({
               {
                 '--btn-accent': filledAccent,
                 '--btn-on-accent': filledOnAccent,
+                ...(filledGradientCss ? { backgroundImage: filledGradientCss } : {}),
               } as React.CSSProperties
             }
             aria-label={favorited ? 'Unfavorite' : 'Favorite'}
@@ -169,13 +178,17 @@ function PhonePreview({
             {favorited ? 'Favorited' : 'Favorite'}
           </button>
           <button
-            className={`btn-follow${following ? ' btn-follow--active' : ''}`}
+            className={`btn-follow${following ? ' btn-follow--active' : ''}${
+              accentGradientCss && outlineColor === accent ? ' btn-follow--gradient' : ''
+            }`}
             onClick={() => setFollowing((f) => !f)}
             style={
               {
                 '--btn-accent': accent,
                 '--btn-text': outlineColor,
                 '--btn-soft': accentSoft,
+                '--btn-gradient': accentGradientCss,
+                '--btn-surface': surface,
               } as React.CSSProperties
             }
             aria-label={following ? 'Unfollow' : 'Follow'}
@@ -218,7 +231,7 @@ function PhonePreview({
         <div
           className="phone-card phone-card--accent"
           style={{
-            background: accentSoft,
+            ...(softGradientCss ? { backgroundImage: softGradientCss } : { background: accentSoft }),
             borderRadius: 12,
             padding: '14px 16px',
             marginBottom: 12,
@@ -312,10 +325,40 @@ function PhonePreview({
   )
 }
 
-export default function AppPreview({ tokens }: Props) {
+function StyleToggle({
+  colorStyle,
+  onColorStyleChange,
+}: {
+  colorStyle: ColorStyle
+  onColorStyleChange: (style: ColorStyle) => void
+}) {
+  const options: { id: ColorStyle; label: string }[] = [
+    { id: 'solid', label: 'Solid' },
+    { id: 'gradient', label: 'Gradient' },
+  ]
+  return (
+    <div className="standard-toggle" role="group" aria-label="Color style">
+      {options.map((option) => (
+        <button
+          key={option.id}
+          className={`standard-toggle__btn${colorStyle === option.id ? ' standard-toggle__btn--active' : ''}`}
+          onClick={() => onColorStyleChange(option.id)}
+          aria-pressed={colorStyle === option.id}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export default function AppPreview({ tokens, colorStyle, onColorStyleChange }: Props) {
   return (
     <section className="app-preview-section">
-      <h2 className="section-title">Live app previews</h2>
+      <div className="token-inspector__header">
+        <h2 className="section-title">Live app previews</h2>
+        <StyleToggle colorStyle={colorStyle} onColorStyleChange={onColorStyleChange} />
+      </div>
 
       <p className="product-statement">
         Fandom platform surfaces are monochrome-first. Universe context provides color.
@@ -334,6 +377,9 @@ export default function AppPreview({ tokens }: Props) {
             filledAccent={tokens.filled.hex}
             filledOnAccent={tokens.filled.onColor ?? '#ffffff'}
             textTarget={tokens.standard.textTarget}
+            accentGradientCss={tokens.light.accent.gradient?.css}
+            softGradientCss={tokens.light.accentSoft.gradient?.css}
+            filledGradientCss={tokens.filled.gradient?.css}
           />
         </div>
         <div className="preview-column">
@@ -346,6 +392,9 @@ export default function AppPreview({ tokens }: Props) {
             filledAccent={tokens.filled.hex}
             filledOnAccent={tokens.filled.onColor ?? '#ffffff'}
             textTarget={tokens.standard.textTarget}
+            accentGradientCss={tokens.dark.accent.gradient?.css}
+            softGradientCss={tokens.dark.accentSoft.gradient?.css}
+            filledGradientCss={tokens.filled.gradient?.css}
           />
         </div>
       </div>

@@ -23,13 +23,13 @@ function StandardToggle({
 }) {
   return (
     <div className="standard-toggle" role="group" aria-label="Accessibility target">
-      {Object.values(CONTRAST_STANDARDS).map((standard) => (
+      {Object.entries(CONTRAST_STANDARDS).map(([key, standard]) => (
         <button
-          key={standard.id}
-          className={`standard-toggle__btn${standardId === standard.id ? ' standard-toggle__btn--active' : ''}`}
-          onClick={() => onStandardChange(standard.id as keyof typeof CONTRAST_STANDARDS)}
+          key={key}
+          className={`standard-toggle__btn${standardId === key ? ' standard-toggle__btn--active' : ''}`}
+          onClick={() => onStandardChange(key as keyof typeof CONTRAST_STANDARDS)}
           title={standard.description}
-          aria-pressed={standardId === standard.id}
+          aria-pressed={standardId === key}
         >
           {standard.label}
         </button>
@@ -50,7 +50,10 @@ function TokenRow({ token }: { token: TokenResult }) {
 
   return (
     <div className="token-row">
-      <span className="token-swatch" style={{ background: token.hex }} />
+      <span
+        className="token-swatch"
+        style={token.gradient ? { backgroundImage: token.gradient.css } : { background: token.hex }}
+      />
       <div className="token-row__main">
         <div className="token-row__line1">
           <code className="token-name">{token.tokenName}</code>

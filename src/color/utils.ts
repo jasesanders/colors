@@ -18,6 +18,13 @@ export interface OklchColor {
   h: number
 }
 
+export interface GradientStops {
+  from: string
+  to: string
+  /** Ready-to-use CSS value, e.g. `linear-gradient(45deg, #fff, #000)`. */
+  css: string
+}
+
 export interface TokenResult {
   tokenName: string
   hex: string
@@ -29,7 +36,11 @@ export interface TokenResult {
   notes: string[]
   /** For tokens meant to sit under text/icons of a fixed color (e.g. a filled button), which color that is. */
   onColor?: string
+  /** Present only in gradient mode, and only for tokens eligible for a gradient treatment. */
+  gradient?: GradientStops
 }
+
+export type ColorStyle = 'solid' | 'gradient'
 
 export interface ContrastStandard {
   id: string
@@ -45,6 +56,7 @@ export interface GeneratedTokens {
   sourceHex: string
   sourceOklch: OklchColor
   standard: ContrastStandard
+  colorStyle: ColorStyle
   light: {
     accent: TokenResult
     accentContent: TokenResult
@@ -84,6 +96,16 @@ export const CONTRAST_STANDARDS: Record<string, ContrastStandard> = {
     textTarget: 7.0,
     interactiveTarget: 4.5,
   },
+  // Not a WCAG level — AAA's 4.5:1 non-text figure is only borrowed from AA's
+  // text target and can still look thin on a filled button. This pushes past
+  // any official spec to a firmer floor for interactive elements.
+  AAA_PLUS: {
+    id: 'AAA+',
+    label: 'WCAG AAA+',
+    description: 'Beyond AAA — a firmer contrast floor for buttons and controls.',
+    textTarget: 7.0,
+    interactiveTarget: 6.0,
+  },
 }
 
 export const DEFAULT_CONTRAST_STANDARD = CONTRAST_STANDARDS.AA
@@ -94,6 +116,14 @@ export const DEFAULT_CONTRAST_STANDARD = CONTRAST_STANDARDS.AA
 // for near-white — rather than a literal #ffffff/#000000.
 const ACHROMATIC_CHROMA_EPSILON = 0.005
 const NEAR_WHITE_FALLBACK = '#ededed'
+
+// Gradient stops are a lightness spread around a token's own (already
+// accessibility-adjusted) color, expressed as a fraction of the 0–1 OKLCH
+// lightness range. Kept subtle for surfaces, a bit bolder for buttons/
+// outlines, and unused entirely for text (see generateTokens).
+const SURFACE_GRADIENT_SPREAD = 0.08
+const BUTTON_GRADIENT_SPREAD = 0.2
+const GRADIENT_ANGLE_DEG = 45
 
 // ─── sRGB ↔ Linear ───────────────────────────────────────────────────────────
 
@@ -241,6 +271,18 @@ export function oklchToHex(
     finalC: bestC,
     chromaReduced: true,
   }
+}
+
+/**
+ * Build a 45deg gradient centered on `oklch`, spreading lightness by
+ * `spread` (a fraction of the 0–1 range) split evenly lighter/darker.
+ * Hue and chroma are held constant; each stop is gamut-mapped independently.
+ */
+function buildGradient(oklch: OklchColor, spread: number): GradientStops {
+  const half = spread / 2
+  const { hex: from } = oklchToHex(clamp01(oklch.l + half), oklch.c, oklch.h)
+  const { hex: to } = oklchToHex(clamp01(oklch.l - half), oklch.c, oklch.h)
+  return { from, to, css: `linear-gradient(${GRADIENT_ANGLE_DEG}deg, ${from}, ${to})` }
 }
 
 /**
@@ -484,6 +526,7 @@ function generateFilledToken(source: OklchColor, textTarget: number): TokenResul
 export function generateTokens(
   sourceHex: string,
   standard: ContrastStandard = DEFAULT_CONTRAST_STANDARD,
+  colorStyle: ColorStyle = 'solid',
 ): GeneratedTokens {
   const { textTarget, interactiveTarget } = standard
   const rawHex = sourceHex.startsWith('#') ? sourceHex : `#${sourceHex}`
@@ -528,7 +571,7 @@ export function generateTokens(
   const darkSoftResult = generateSoftTint(sourceOklch, 'dark')
   const darkSoftContrast = wcagContrast(darkSoftResult.hex, DARK_SURFACE)
 
-  const light = {
+  const light: GeneratedTokens['light'] = {
     accent: {
       tokenName: '--universe-accent-light',
       hex: lightAccentResult.hex,
@@ -561,7 +604,7 @@ export function generateTokens(
     },
   }
 
-  const dark = {
+  const dark: GeneratedTokens['dark'] = {
     accent: {
       tokenName: '--universe-accent-dark',
       hex: darkAccentResult.hex,
@@ -596,7 +639,20 @@ export function generateTokens(
 
   const filled = generateFilledToken(sourceOklch, textTarget)
 
-  const fmt = (t: TokenResult) => `  ${t.tokenName}: ${t.hex}; /* ${t.role} */`
+  if (colorStyle === 'gradient') {
+    light.accent.gradient = buildGradient(light.accent.oklch, BUTTON_GRADIENT_SPREAD)
+    light.accentSoft.gradient = buildGradient(light.accentSoft.oklch, SURFACE_GRADIENT_SPREAD)
+    dark.accent.gradient = buildGradient(dark.accent.oklch, BUTTON_GRADIENT_SPREAD)
+    dark.accentSoft.gradient = buildGradient(dark.accentSoft.oklch, SURFACE_GRADIENT_SPREAD)
+    filled.gradient = buildGradient(filled.oklch, BUTTON_GRADIENT_SPREAD)
+    // accentContent (text/links) intentionally never gets a gradient.
+  }
+
+  const fmt = (t: TokenResult) => {
+    const lines = [`  ${t.tokenName}: ${t.hex}; /* ${t.role} */`]
+    if (t.gradient) lines.push(`  ${t.tokenName}-gradient: ${t.gradient.css};`)
+    return lines.join('\n')
+  }
 
   const cssVariables = `:root {\n${[
     fmt(light.accent),
@@ -614,6 +670,7 @@ export function generateTokens(
     sourceHex: normalizedHex,
     sourceOklch,
     standard,
+    colorStyle,
     light,
     dark,
     filled,
