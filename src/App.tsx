@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { generateTokens } from './color/utils'
+import { CONTRAST_STANDARDS, generateTokens, sanitizeSourceHex } from './color/utils'
 import ColorPickerSection from './components/ColorPickerSection'
 import TokenInspector from './components/TokenInspector'
 import AppPreview from './components/AppPreview'
@@ -8,7 +8,12 @@ const DEFAULT_HEX = '#cc1520'
 
 export default function App() {
   const [sourceHex, setSourceHex] = useState(DEFAULT_HEX)
-  const tokens = generateTokens(sourceHex)
+  const [standardId, setStandardId] = useState<keyof typeof CONTRAST_STANDARDS>('AA')
+  const tokens = generateTokens(sourceHex, CONTRAST_STANDARDS[standardId])
+
+  function handleSourceChange(hex: string) {
+    setSourceHex(sanitizeSourceHex(hex) ?? hex)
+  }
 
   return (
     <div className="app">
@@ -24,8 +29,8 @@ export default function App() {
 
       <main className="app-main">
         <div className="cms-panel">
-          <ColorPickerSection value={sourceHex} onChange={setSourceHex} />
-          <TokenInspector tokens={tokens} />
+          <ColorPickerSection value={sourceHex} onChange={handleSourceChange} />
+          <TokenInspector tokens={tokens} standardId={standardId} onStandardChange={setStandardId} />
         </div>
 
         <div className="preview-panel">

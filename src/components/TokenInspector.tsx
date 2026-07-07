@@ -2,15 +2,40 @@ import { useState } from 'react'
 import {
   type GeneratedTokens,
   type TokenResult,
+  CONTRAST_STANDARDS,
   DARK_SURFACE,
-  INTERACTIVE_CONTRAST_TARGET,
   LIGHT_SURFACE,
-  TEXT_CONTRAST_TARGET,
   formatOklch,
 } from '../color/utils'
 
 interface Props {
   tokens: GeneratedTokens
+  standardId: keyof typeof CONTRAST_STANDARDS
+  onStandardChange: (id: keyof typeof CONTRAST_STANDARDS) => void
+}
+
+function StandardToggle({
+  standardId,
+  onStandardChange,
+}: {
+  standardId: keyof typeof CONTRAST_STANDARDS
+  onStandardChange: (id: keyof typeof CONTRAST_STANDARDS) => void
+}) {
+  return (
+    <div className="standard-toggle" role="group" aria-label="Accessibility target">
+      {Object.values(CONTRAST_STANDARDS).map((standard) => (
+        <button
+          key={standard.id}
+          className={`standard-toggle__btn${standardId === standard.id ? ' standard-toggle__btn--active' : ''}`}
+          onClick={() => onStandardChange(standard.id as keyof typeof CONTRAST_STANDARDS)}
+          title={standard.description}
+          aria-pressed={standardId === standard.id}
+        >
+          {standard.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function TokenRow({ token }: { token: TokenResult }) {
@@ -24,25 +49,25 @@ function TokenRow({ token }: { token: TokenResult }) {
     )
 
   return (
-    <tr className="token-row">
-      <td>
-        <span className="token-swatch" style={{ background: token.hex }} />
-      </td>
-      <td>
-        <code className="token-name">{token.tokenName}</code>
-      </td>
-      <td>
-        <code className="token-hex">{token.hex}</code>
-      </td>
-      <td className="token-role">{token.role}</td>
-      <td className="token-contrast">
-        {token.contrastRatio.toFixed(2)}:1
-        {token.contrastTarget && (
-          <span className="contrast-target"> (≥{token.contrastTarget}:1)</span>
-        )}
-      </td>
-      <td>{passLabel}</td>
-    </tr>
+    <div className="token-row">
+      <span className="token-swatch" style={{ background: token.hex }} />
+      <div className="token-row__main">
+        <div className="token-row__line1">
+          <code className="token-name">{token.tokenName}</code>
+          <code className="token-hex">{token.hex}</code>
+        </div>
+        <div className="token-role">{token.role}</div>
+      </div>
+      <div className="token-row__end">
+        {passLabel}
+        <span className="token-contrast">
+          {token.contrastRatio.toFixed(2)}:1
+          {token.contrastTarget && (
+            <span className="contrast-target"> (≥{token.contrastTarget}:1)</span>
+          )}
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -54,6 +79,7 @@ function RulesPanel({ tokens }: { tokens: GeneratedTokens }) {
     tokens.dark.accent,
     tokens.dark.accentContent,
     tokens.dark.accentSoft,
+    tokens.filled,
   ]
 
   return (
@@ -90,15 +116,15 @@ function RulesPanel({ tokens }: { tokens: GeneratedTokens }) {
           </span>
         </div>
         <div className="rules-meta__row">
-          <span className="rules-meta__label">3:1 non-text target</span>
+          <span className="rules-meta__label">Non-text target</span>
           <span className="rules-meta__value">
-            WCAG AA for interactive controls ({INTERACTIVE_CONTRAST_TARGET}:1)
+            {tokens.standard.label} for interactive controls ({tokens.standard.interactiveTarget}:1)
           </span>
         </div>
         <div className="rules-meta__row">
-          <span className="rules-meta__label">4.5:1 text target</span>
+          <span className="rules-meta__label">Text target</span>
           <span className="rules-meta__value">
-            WCAG AA for normal text ({TEXT_CONTRAST_TARGET}:1)
+            {tokens.standard.label} for normal text ({tokens.standard.textTarget}:1)
           </span>
         </div>
       </div>
@@ -128,7 +154,7 @@ function RulesPanel({ tokens }: { tokens: GeneratedTokens }) {
   )
 }
 
-export default function TokenInspector({ tokens }: Props) {
+export default function TokenInspector({ tokens, standardId, onStandardChange }: Props) {
   const [copied, setCopied] = useState(false)
 
   function handleCopy() {
@@ -140,49 +166,35 @@ export default function TokenInspector({ tokens }: Props) {
 
   return (
     <section className="token-inspector">
-      <h2 className="section-title">Generated color system</h2>
+      <div className="token-inspector__header">
+        <h2 className="section-title">Generated color system</h2>
+        <StandardToggle standardId={standardId} onStandardChange={onStandardChange} />
+      </div>
 
       <div className="token-tables">
         <div className="token-table-group">
           <h3 className="token-table-mode">☀ Light mode</h3>
-          <table className="token-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>Token</th>
-                <th>Value</th>
-                <th>Role</th>
-                <th>Contrast</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <TokenRow token={tokens.light.accent} />
-              <TokenRow token={tokens.light.accentContent} />
-              <TokenRow token={tokens.light.accentSoft} />
-            </tbody>
-          </table>
+          <div className="token-list">
+            <TokenRow token={tokens.light.accent} />
+            <TokenRow token={tokens.light.accentContent} />
+            <TokenRow token={tokens.light.accentSoft} />
+          </div>
         </div>
 
         <div className="token-table-group">
           <h3 className="token-table-mode">◗ Dark mode</h3>
-          <table className="token-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>Token</th>
-                <th>Value</th>
-                <th>Role</th>
-                <th>Contrast</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <TokenRow token={tokens.dark.accent} />
-              <TokenRow token={tokens.dark.accentContent} />
-              <TokenRow token={tokens.dark.accentSoft} />
-            </tbody>
-          </table>
+          <div className="token-list">
+            <TokenRow token={tokens.dark.accent} />
+            <TokenRow token={tokens.dark.accentContent} />
+            <TokenRow token={tokens.dark.accentSoft} />
+          </div>
+        </div>
+
+        <div className="token-table-group">
+          <h3 className="token-table-mode">◐ Filled button (shared, both themes)</h3>
+          <div className="token-list">
+            <TokenRow token={tokens.filled} />
+          </div>
         </div>
       </div>
 

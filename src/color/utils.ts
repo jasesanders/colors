@@ -27,11 +27,24 @@ export interface TokenResult {
   passes: boolean | null
   role: string
   notes: string[]
+  /** For tokens meant to sit under text/icons of a fixed color (e.g. a filled button), which color that is. */
+  onColor?: string
+}
+
+export interface ContrastStandard {
+  id: string
+  label: string
+  description: string
+  /** Minimum contrast for colored text/icons that carry meaning (WCAG "normal text"). */
+  textTarget: number
+  /** Minimum contrast for non-text UI (borders, controls, selected states). */
+  interactiveTarget: number
 }
 
 export interface GeneratedTokens {
   sourceHex: string
   sourceOklch: OklchColor
+  standard: ContrastStandard
   light: {
     accent: TokenResult
     accentContent: TokenResult
@@ -42,6 +55,8 @@ export interface GeneratedTokens {
     accentContent: TokenResult
     accentSoft: TokenResult
   }
+  /** Shared across themes — background for filled/primary buttons, guaranteed to pair with accessible black or white text. */
+  filled: TokenResult
   cssVariables: string
 }
 
@@ -49,8 +64,36 @@ export interface GeneratedTokens {
 
 export const LIGHT_SURFACE = '#ffffff'
 export const DARK_SURFACE = '#121212'
-export const INTERACTIVE_CONTRAST_TARGET = 3.0
-export const TEXT_CONTRAST_TARGET = 4.5
+
+// WCAG 2.1 only defines a non-text (1.4.11) target at the AA level — there's
+// no official AAA equivalent for UI components. For the AAA profile here we
+// bump the interactive target up to what AA requires of text (4.5:1), as a
+// stricter proxy, while the text target follows the real AAA figure (7:1).
+export const CONTRAST_STANDARDS: Record<string, ContrastStandard> = {
+  AA: {
+    id: 'AA',
+    label: 'WCAG AA',
+    description: 'Standard web accessibility baseline.',
+    textTarget: 4.5,
+    interactiveTarget: 3.0,
+  },
+  AAA: {
+    id: 'AAA',
+    label: 'WCAG AAA',
+    description: 'Enhanced contrast for maximum legibility.',
+    textTarget: 7.0,
+    interactiveTarget: 4.5,
+  },
+}
+
+export const DEFAULT_CONTRAST_STANDARD = CONTRAST_STANDARDS.AA
+
+// A source color this close to fully neutral (gray/white/black) has no
+// usable hue. Snap it to the same kind of "slightly less intense" neutral
+// already used for surfaces — DARK_SURFACE for near-black, and its mirror
+// for near-white — rather than a literal #ffffff/#000000.
+const ACHROMATIC_CHROMA_EPSILON = 0.005
+const NEAR_WHITE_FALLBACK = '#ededed'
 
 // ─── sRGB ↔ Linear ───────────────────────────────────────────────────────────
 
@@ -200,6 +243,28 @@ export function oklchToHex(
   }
 }
 
+/**
+ * Guard against a source color with no usable hue (pure white, pure black,
+ * or any near-neutral gray). Snaps it to the near-black or near-white
+ * neutral fallback — it stays achromatic, just slightly darker or lighter
+ * than the input.
+ */
+function sanitizeSourceOklch(oklch: OklchColor): OklchColor {
+  if (oklch.c >= ACHROMATIC_CHROMA_EPSILON) return oklch
+  return hexToOklch(oklch.l >= 0.5 ? NEAR_WHITE_FALLBACK : DARK_SURFACE)
+}
+
+/**
+ * Validate + sanitize a hex color for use as the canonical source color.
+ * Returns null if invalid, otherwise a hex guaranteed to be off pure white/black.
+ */
+export function sanitizeSourceHex(hex: string): string | null {
+  const normalized = validateHex(hex)
+  if (!normalized) return null
+  const oklch = sanitizeSourceOklch(hexToOklch(normalized))
+  return oklchToHex(oklch.l, oklch.c, oklch.h).hex
+}
+
 // ─── WCAG Contrast ───────────────────────────────────────────────────────────
 
 export function relativeLuminance(hex: string): number {
@@ -346,20 +411,89 @@ function generateSoftTint(
   }
 }
 
+// ─── Filled Button Token ─────────────────────────────────────────────────────
+
+/**
+ * Generate the background token for filled/primary buttons.
+ *
+ * Unlike the surface-relative accent tokens, this token must work with a
+ * fixed on-color (black or white) text/icon layer. If the source color
+ * already lets black or white text reach 4.5:1, it's used as-is. Otherwise
+ * lightness is nudged toward whichever direction (lighter, for black text,
+ * or darker, for white text) reaches 4.5:1 with the smallest change from
+ * the source — so the token stays as close as possible to the input color.
+ */
+function generateFilledToken(source: OklchColor, textTarget: number): TokenResult {
+  const { hex: sourceHex } = oklchToHex(source.l, source.c, source.h)
+  const contrastWithWhite = wcagContrast(sourceHex, '#ffffff')
+  const contrastWithBlack = wcagContrast(sourceHex, '#000000')
+
+  if (contrastWithWhite >= textTarget || contrastWithBlack >= textTarget) {
+    const onColor = contrastWithBlack >= contrastWithWhite ? '#000000' : '#ffffff'
+    const contrastRatio = Math.max(contrastWithWhite, contrastWithBlack)
+    return {
+      tokenName: '--universe-accent-filled',
+      hex: sourceHex,
+      oklch: source,
+      contrastRatio,
+      contrastTarget: textTarget,
+      passes: true,
+      role: `Filled/primary button background — pairs with ${onColor === '#000000' ? 'black' : 'white'} text/icons`,
+      onColor,
+      notes: [
+        `Source already supports ${onColor === '#000000' ? 'black' : 'white'} text at ${contrastRatio.toFixed(2)}:1. No adjustment required.`,
+      ],
+    }
+  }
+
+  // Lighten toward black-text territory, and separately darken toward
+  // white-text territory — then keep whichever needed the smaller nudge.
+  const lightened = adjustForContrast(source, '#000000', textTarget, 'dark')
+  const darkened = adjustForContrast(source, '#ffffff', textTarget, 'light')
+
+  const lightenDelta = Math.abs(lightened.oklch.l - source.l)
+  const darkenDelta = Math.abs(darkened.oklch.l - source.l)
+  const useLightened = lightenDelta <= darkenDelta
+
+  const chosen = useLightened ? lightened : darkened
+  const onColor = useLightened ? '#000000' : '#ffffff'
+  const contrastRatio = wcagContrast(chosen.hex, onColor)
+
+  return {
+    tokenName: '--universe-accent-filled',
+    hex: chosen.hex,
+    oklch: chosen.oklch,
+    contrastRatio,
+    contrastTarget: textTarget,
+    passes: contrastRatio >= textTarget,
+    role: `Filled/primary button background — pairs with ${onColor === '#000000' ? 'black' : 'white'} text/icons`,
+    onColor,
+    notes: [
+      ...chosen.notes,
+      `Nudged ${useLightened ? 'lighter' : 'darker'} (closest viable direction) so ${onColor === '#000000' ? 'black' : 'white'} text/icons reach ${textTarget}:1.`,
+    ],
+  }
+}
+
 // ─── Token Generator ─────────────────────────────────────────────────────────
 
 /**
  * Generate the full set of Universe color tokens from a single canonical source hex.
  * All transformations are deterministic and OKLCH-based.
  */
-export function generateTokens(sourceHex: string): GeneratedTokens {
-  const normalizedHex = sourceHex.startsWith('#') ? sourceHex : `#${sourceHex}`
-  const sourceOklch = hexToOklch(normalizedHex)
+export function generateTokens(
+  sourceHex: string,
+  standard: ContrastStandard = DEFAULT_CONTRAST_STANDARD,
+): GeneratedTokens {
+  const { textTarget, interactiveTarget } = standard
+  const rawHex = sourceHex.startsWith('#') ? sourceHex : `#${sourceHex}`
+  const sourceOklch = sanitizeSourceOklch(hexToOklch(rawHex))
+  const normalizedHex = oklchToHex(sourceOklch.l, sourceOklch.c, sourceOklch.h).hex
 
   const lightAccentResult = adjustForContrast(
     sourceOklch,
     LIGHT_SURFACE,
-    INTERACTIVE_CONTRAST_TARGET,
+    interactiveTarget,
     'light',
   )
   const lightAccentContrast = wcagContrast(lightAccentResult.hex, LIGHT_SURFACE)
@@ -367,7 +501,7 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
   const lightContentResult = adjustForContrast(
     sourceOklch,
     LIGHT_SURFACE,
-    TEXT_CONTRAST_TARGET,
+    textTarget,
     'light',
   )
   const lightContentContrast = wcagContrast(lightContentResult.hex, LIGHT_SURFACE)
@@ -378,7 +512,7 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
   const darkAccentResult = adjustForContrast(
     sourceOklch,
     DARK_SURFACE,
-    INTERACTIVE_CONTRAST_TARGET,
+    interactiveTarget,
     'dark',
   )
   const darkAccentContrast = wcagContrast(darkAccentResult.hex, DARK_SURFACE)
@@ -386,7 +520,7 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
   const darkContentResult = adjustForContrast(
     sourceOklch,
     DARK_SURFACE,
-    TEXT_CONTRAST_TARGET,
+    textTarget,
     'dark',
   )
   const darkContentContrast = wcagContrast(darkContentResult.hex, DARK_SURFACE)
@@ -400,8 +534,8 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
       hex: lightAccentResult.hex,
       oklch: lightAccentResult.oklch,
       contrastRatio: lightAccentContrast,
-      contrastTarget: INTERACTIVE_CONTRAST_TARGET,
-      passes: lightAccentContrast >= INTERACTIVE_CONTRAST_TARGET,
+      contrastTarget: interactiveTarget,
+      passes: lightAccentContrast >= interactiveTarget,
       role: 'Interactive controls, selected states, non-text UI',
       notes: lightAccentResult.notes,
     },
@@ -410,8 +544,8 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
       hex: lightContentResult.hex,
       oklch: lightContentResult.oklch,
       contrastRatio: lightContentContrast,
-      contrastTarget: TEXT_CONTRAST_TARGET,
-      passes: lightContentContrast >= TEXT_CONTRAST_TARGET,
+      contrastTarget: textTarget,
+      passes: lightContentContrast >= textTarget,
       role: 'Colored text, links, icons requiring contrast',
       notes: lightContentResult.notes,
     },
@@ -433,8 +567,8 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
       hex: darkAccentResult.hex,
       oklch: darkAccentResult.oklch,
       contrastRatio: darkAccentContrast,
-      contrastTarget: INTERACTIVE_CONTRAST_TARGET,
-      passes: darkAccentContrast >= INTERACTIVE_CONTRAST_TARGET,
+      contrastTarget: interactiveTarget,
+      passes: darkAccentContrast >= interactiveTarget,
       role: 'Interactive controls, selected states, non-text UI',
       notes: darkAccentResult.notes,
     },
@@ -443,8 +577,8 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
       hex: darkContentResult.hex,
       oklch: darkContentResult.oklch,
       contrastRatio: darkContentContrast,
-      contrastTarget: TEXT_CONTRAST_TARGET,
-      passes: darkContentContrast >= TEXT_CONTRAST_TARGET,
+      contrastTarget: textTarget,
+      passes: darkContentContrast >= textTarget,
       role: 'Colored text, links, icons requiring contrast',
       notes: darkContentResult.notes,
     },
@@ -460,6 +594,8 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
     },
   }
 
+  const filled = generateFilledToken(sourceOklch, textTarget)
+
   const fmt = (t: TokenResult) => `  ${t.tokenName}: ${t.hex}; /* ${t.role} */`
 
   const cssVariables = `:root {\n${[
@@ -470,13 +606,17 @@ export function generateTokens(sourceHex: string): GeneratedTokens {
     fmt(dark.accent),
     fmt(dark.accentContent),
     fmt(dark.accentSoft),
+    '',
+    fmt(filled),
   ].join('\n')}\n}`
 
   return {
     sourceHex: normalizedHex,
     sourceOklch,
+    standard,
     light,
     dark,
+    filled,
     cssVariables,
   }
 }
@@ -499,4 +639,31 @@ export function validateHex(value: string): string | null {
  */
 export function formatOklch(oklch: OklchColor): string {
   return `oklch(${(oklch.l * 100).toFixed(1)}% ${oklch.c.toFixed(3)} ${oklch.h.toFixed(1)}°)`
+}
+
+/**
+ * Pick black or white — whichever has higher WCAG contrast — for text/icons
+ * placed directly on top of `bgHex` (e.g. a filled accent-colored button).
+ */
+export function accessibleOnColor(bgHex: string): string {
+  const whiteContrast = wcagContrast(bgHex, '#ffffff')
+  const blackContrast = wcagContrast(bgHex, '#000000')
+  return whiteContrast >= blackContrast ? '#ffffff' : '#000000'
+}
+
+/**
+ * Color for accent-colored text/icons/borders that sit directly on a
+ * surface (e.g. an outline button), rather than on a filled background.
+ * The accent token is only guaranteed to meet the interactive (non-text UI)
+ * target against its surface, so when it's reused as a text label it can
+ * fall short of the text target. Keep the brand accent when it clears that
+ * bar; otherwise fall back to whichever of black/white is accessible
+ * against the surface.
+ */
+export function accessibleAccentOnSurface(
+  accentHex: string,
+  surfaceHex: string,
+  textTarget: number,
+): string {
+  return wcagContrast(accentHex, surfaceHex) >= textTarget ? accentHex : accessibleOnColor(surfaceHex)
 }

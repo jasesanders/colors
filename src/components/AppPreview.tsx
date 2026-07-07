@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { GeneratedTokens } from '../color/utils'
+import { accessibleAccentOnSurface, type GeneratedTokens } from '../color/utils'
 
 interface Props {
   tokens: GeneratedTokens
@@ -10,11 +10,17 @@ function PhonePreview({
   accent,
   accentContent,
   accentSoft,
+  filledAccent,
+  filledOnAccent,
+  textTarget,
 }: {
   mode: 'light' | 'dark'
   accent: string
   accentContent: string
   accentSoft: string
+  filledAccent: string
+  filledOnAccent: string
+  textTarget: number
 }) {
   const [favorited, setFavorited] = useState(false)
   const [following, setFollowing] = useState(false)
@@ -28,6 +34,7 @@ function PhonePreview({
   const border = isDark ? '#2a2a2a' : '#ebebeb'
   const cardBg = isDark ? '#1e1e1e' : '#f8f8f8'
   const navBg = isDark ? '#171717' : '#ffffff'
+  const outlineColor = accessibleAccentOnSurface(accent, surface, textTarget)
 
   const tabs = ['overview', 'updates', 'wiki']
 
@@ -143,8 +150,8 @@ function PhonePreview({
             onClick={() => setFavorited((f) => !f)}
             style={
               {
-                '--btn-accent': accent,
-                '--btn-soft': accentSoft,
+                '--btn-accent': filledAccent,
+                '--btn-on-accent': filledOnAccent,
               } as React.CSSProperties
             }
             aria-label={favorited ? 'Unfavorite' : 'Favorite'}
@@ -167,6 +174,7 @@ function PhonePreview({
             style={
               {
                 '--btn-accent': accent,
+                '--btn-text': outlineColor,
                 '--btn-soft': accentSoft,
               } as React.CSSProperties
             }
@@ -323,6 +331,9 @@ export default function AppPreview({ tokens }: Props) {
             accent={tokens.light.accent.hex}
             accentContent={tokens.light.accentContent.hex}
             accentSoft={tokens.light.accentSoft.hex}
+            filledAccent={tokens.filled.hex}
+            filledOnAccent={tokens.filled.onColor ?? '#ffffff'}
+            textTarget={tokens.standard.textTarget}
           />
         </div>
         <div className="preview-column">
@@ -332,6 +343,9 @@ export default function AppPreview({ tokens }: Props) {
             accent={tokens.dark.accent.hex}
             accentContent={tokens.dark.accentContent.hex}
             accentSoft={tokens.dark.accentSoft.hex}
+            filledAccent={tokens.filled.hex}
+            filledOnAccent={tokens.filled.onColor ?? '#ffffff'}
+            textTarget={tokens.standard.textTarget}
           />
         </div>
       </div>
