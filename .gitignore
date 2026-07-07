@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# TypeScript build info
+tsconfig.*.tsbuildinfo
+
+# Editor / OS
+.DS_Store
+*.local
+.vscode/
