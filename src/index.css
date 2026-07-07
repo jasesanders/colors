@@ -660,6 +660,34 @@ pre {
   gap: 6px;
   padding: 8px 16px;
   border-radius: 20px;
+  border: none;
+  background: var(--btn-accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: filter 0.2s, transform 0.1s;
+}
+
+.btn-favorite:hover {
+  filter: brightness(0.93);
+}
+
+.btn-favorite--active {
+  filter: brightness(0.85);
+}
+
+.btn-favorite:active {
+  transform: scale(0.96);
+}
+
+.btn-follow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
   border: 1.5px solid var(--btn-accent);
   background: transparent;
   color: var(--btn-accent);
@@ -670,17 +698,17 @@ pre {
   transition: background 0.2s, color 0.15s, transform 0.1s;
 }
 
-.btn-favorite:hover {
+.btn-follow:hover {
   background: color-mix(in srgb, var(--btn-accent) 12%, transparent);
 }
 
-.btn-favorite--active {
+.btn-follow--active {
   background: var(--btn-soft) !important;
   color: var(--btn-accent) !important;
   border-color: var(--btn-accent) !important;
 }
 
-.btn-favorite:active {
+.btn-follow:active {
   transform: scale(0.96);
 }
 
