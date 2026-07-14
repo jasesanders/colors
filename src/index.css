@@ -999,6 +999,7 @@ pre {
   font-weight: 700;
   font-family: var(--font);
   cursor: pointer;
+  box-shadow: 4px 4px 12px rgb(0 0 0 / 12%);
   transition: filter 0.15s;
 }
 

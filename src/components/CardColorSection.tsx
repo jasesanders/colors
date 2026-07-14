@@ -60,7 +60,7 @@ export default function CardColorSection({ filledHex, filledOnColor, standard }:
     e.target.value = ''
   }
 
-  const cardSurface = dominantHex ? deriveCardSurfaceToken(dominantHex, standard) : null
+  const cardSurface = dominantHex ? deriveCardSurfaceToken(dominantHex, standard, filledHex) : null
 
   const sourceToken: TokenResult | null = cardSurface
     ? {

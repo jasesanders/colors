@@ -816,6 +816,64 @@ export interface CardSurfaceToken {
   notes: string[]
 }
 
+// Not a WCAG figure — same spirit as DARK_BUTTON_MIN_SURFACE_CONTRAST above:
+// a floor just high enough that the CTA button reads as a distinct shape
+// against the card's own background hue, not full accessible contrast (the
+// button's own text contrast already covers that). Image key art can easily
+// land on a hue close to the Universe accent color (see e.g. a teal/cyan
+// screenshot against a teal accent button), in which case the button all
+// but disappears into the gradient.
+const MIN_CARD_VS_BUTTON_CONTRAST = 1.5
+
+/**
+ * If the card surface color is too close to the CTA button's color to read
+ * as a distinct shape, darken (and mildly desaturate) the surface — never
+ * the button — just enough to clear a minimum differentiation floor. Chroma
+ * is scaled down alongside lightness so the darkening doesn't read as an
+ * arbitrary hue shift. The button itself is never touched: it's a shared
+ * Universe-level token used elsewhere, not something this one card should
+ * override.
+ */
+function ensureCardButtonContrast(
+  surface: { hex: string; oklch: OklchColor },
+  buttonHex: string,
+): { hex: string; oklch: OklchColor; note?: string } {
+  const contrastVsButton = wcagContrast(surface.hex, buttonHex)
+  if (contrastVsButton >= MIN_CARD_VS_BUTTON_CONTRAST) return surface
+
+  const { l, c, h } = surface.oklch
+
+  const chromaAt = (candidateL: number) => {
+    const chromaScale = l > 0 ? 0.6 + 0.4 * (candidateL / l) : 1
+    return c * chromaScale
+  }
+
+  // Largest L (smallest darkening step from the current surface) that
+  // clears the floor — contrast vs. a fixed button color rises as the
+  // surface darkens away from it in the typical case where the button
+  // isn't itself near-black.
+  let lo = 0
+  let hi = l
+  let bestL = 0
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2
+    const { hex } = oklchToHex(mid, chromaAt(mid), h)
+    if (wcagContrast(hex, buttonHex) >= MIN_CARD_VS_BUTTON_CONTRAST) {
+      bestL = mid
+      lo = mid
+    } else {
+      hi = mid
+    }
+  }
+
+  const { hex: finalHex, finalC } = oklchToHex(bestL, chromaAt(bestL), h)
+  return {
+    hex: finalHex,
+    oklch: { l: bestL, c: finalC, h },
+    note: `Darkened from ${Math.round(l * 100)}% to ${Math.round(bestL * 100)}% lightness (chroma trimmed to match) so the CTA button stays visually distinct (≥${MIN_CARD_VS_BUTTON_CONTRAST}:1) from a similarly-hued card background.`,
+  }
+}
+
 /**
  * Derive an accessible card-gradient surface color from a raw dominant hue
  * (e.g. extracted from a Universe's key art). The color is treated as a
@@ -823,23 +881,43 @@ export interface CardSurfaceToken {
  * inverse relationship of the light-mode accent token above, but the same
  * underlying technique: darken (in OKLCH) via `adjustForContrast` until the
  * fixed foreground color reaches the standard's text contrast target.
+ *
+ * When `buttonHex` (the Universe's CTA color) is provided, a second pass
+ * (ensureCardButtonContrast) guards against the card's own background
+ * landing too close to the button's hue for the CTA to read as distinct.
  */
 export function deriveCardSurfaceToken(
   dominantHex: string,
   standard: ContrastStandard = DEFAULT_CONTRAST_STANDARD,
+  buttonHex?: string,
 ): CardSurfaceToken {
   const sourceOklch = hexToOklch(dominantHex)
   const result = adjustForContrast(sourceOklch, '#ffffff', standard.textTarget, 'light')
 
+  let finalHex = result.hex
+  let finalOklch = result.oklch
+  const notes = [...result.notes]
+
+  if (buttonHex) {
+    const adjusted = ensureCardButtonContrast({ hex: finalHex, oklch: finalOklch }, buttonHex)
+    if (adjusted.note) {
+      finalHex = adjusted.hex
+      finalOklch = adjusted.oklch
+      notes.push(adjusted.note)
+    }
+  }
+
+  const contrastRatio = wcagContrast(finalHex, '#ffffff')
+
   return {
     sourceHex: dominantHex,
     sourceOklch,
-    hex: result.hex,
-    oklch: result.oklch,
-    contrastRatio: result.finalContrast,
+    hex: finalHex,
+    oklch: finalOklch,
+    contrastRatio,
     contrastTarget: standard.textTarget,
-    passes: result.finalContrast >= standard.textTarget,
-    notes: result.notes,
+    passes: contrastRatio >= standard.textTarget,
+    notes,
   }
 }
 
