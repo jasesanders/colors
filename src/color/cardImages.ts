@@ -16,9 +16,9 @@ export interface CardPreset {
   src: string
 }
 
-const SAMPLE_SIZE = 64
-const HUE_BUCKETS = 24
-const CHROMA_MIN = 0.02
+export const SAMPLE_SIZE = 64
+export const HUE_BUCKETS = 24
+export const CHROMA_MIN = 0.02
 
 /**
  * Downscale the image onto a small offscreen canvas, then bucket pixels by

@@ -4,6 +4,7 @@ import ColorPickerSection from './components/ColorPickerSection'
 import TokenInspector from './components/TokenInspector'
 import AppPreview from './components/AppPreview'
 import CardColorSection from './components/CardColorSection'
+import RulesReference from './components/RulesReference'
 
 const DEFAULT_HEX = '#cc1520'
 
@@ -44,6 +45,12 @@ export default function App() {
           />
         </div>
       </main>
+
+      <footer className="app-footer">
+        <div className="app-footer__inner">
+          <RulesReference />
+        </div>
+      </footer>
     </div>
   )
 }

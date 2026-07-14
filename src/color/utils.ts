@@ -114,16 +114,16 @@ export const DEFAULT_CONTRAST_STANDARD = CONTRAST_STANDARDS.AA
 // usable hue. Snap it to the same kind of "slightly less intense" neutral
 // already used for surfaces — DARK_SURFACE for near-black, and its mirror
 // for near-white — rather than a literal #ffffff/#000000.
-const ACHROMATIC_CHROMA_EPSILON = 0.005
-const NEAR_WHITE_FALLBACK = '#ededed'
+export const ACHROMATIC_CHROMA_EPSILON = 0.005
+export const NEAR_WHITE_FALLBACK = '#ededed'
 
 // Gradient stops are a lightness spread around a token's own (already
 // accessibility-adjusted) color, expressed as a fraction of the 0–1 OKLCH
 // lightness range. Kept subtle for surfaces, a bit bolder for buttons/
 // outlines, and unused entirely for text (see generateTokens).
-const SURFACE_GRADIENT_SPREAD = 0.08
-const BUTTON_GRADIENT_SPREAD = 0.2
-const GRADIENT_ANGLE_DEG = 45
+export const SURFACE_GRADIENT_SPREAD = 0.08
+export const BUTTON_GRADIENT_SPREAD = 0.2
+export const GRADIENT_ANGLE_DEG = 45
 
 // ─── sRGB ↔ Linear ───────────────────────────────────────────────────────────
 
@@ -461,7 +461,7 @@ function generateSoftTint(
 // buttons, the same intent as the near-white/near-black source-color guard
 // above (sanitizeSourceOklch/NEAR_WHITE_FALLBACK): never let the token fully
 // blend into the surface it's meant to be seen on.
-const DARK_BUTTON_MIN_SURFACE_CONTRAST = 1.5
+export const DARK_BUTTON_MIN_SURFACE_CONTRAST = 1.5
 
 interface FilledCandidate {
   hex: string
@@ -823,7 +823,7 @@ export interface CardSurfaceToken {
 // land on a hue close to the Universe accent color (see e.g. a teal/cyan
 // screenshot against a teal accent button), in which case the button all
 // but disappears into the gradient.
-const MIN_CARD_VS_BUTTON_CONTRAST = 1.5
+export const MIN_CARD_VS_BUTTON_CONTRAST = 1.5
 
 /**
  * If the card surface color is too close to the CTA button's color to read
