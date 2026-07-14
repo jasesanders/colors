@@ -133,7 +133,7 @@ function PhonePreview({
           <div
             style={{
               fontSize: 20,
-              fontWeight: 700,
+              fontWeight: 800,
               letterSpacing: '-0.02em',
               textShadow: '0 1px 8px #00000099',
             }}

@@ -455,6 +455,90 @@ function generateSoftTint(
 
 // ─── Filled Button Token ─────────────────────────────────────────────────────
 
+// Not a text-contrast figure — a visibility floor. A filled button dark
+// enough to pair with white text can otherwise sit so close to DARK_SURFACE
+// (#121212) that its pill shape all but disappears. Mirrors, for dark
+// buttons, the same intent as the near-white/near-black source-color guard
+// above (sanitizeSourceOklch/NEAR_WHITE_FALLBACK): never let the token fully
+// blend into the surface it's meant to be seen on.
+const DARK_BUTTON_MIN_SURFACE_CONTRAST = 1.5
+
+interface FilledCandidate {
+  hex: string
+  oklch: OklchColor
+  onColor: string
+  notes: string[]
+}
+
+/**
+ * If a dark (white-text) filled button is too close in luminance to
+ * DARK_SURFACE, lighten it just enough to clear a minimum visibility floor —
+ * capped so it never lightens past the point where white text would drop
+ * below its own contrast target. Light (black-text) buttons are untouched;
+ * they're never dark enough to blend into a near-black surface.
+ */
+function ensureDarkSurfaceVisibility(
+  candidate: FilledCandidate,
+  textTarget: number,
+): FilledCandidate {
+  if (candidate.onColor !== '#ffffff') return candidate
+
+  const contrastVsDark = wcagContrast(candidate.hex, DARK_SURFACE)
+  if (contrastVsDark >= DARK_BUTTON_MIN_SURFACE_CONTRAST) return candidate
+
+  const { l, c, h } = candidate.oklch
+
+  // Smallest L (searching upward from the current lightness) that clears the
+  // visibility floor against DARK_SURFACE — contrast vs. a fixed dark
+  // surface rises monotonically as L increases.
+  let lo = l
+  let hi = 1
+  let minLForVisibility = 1
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2
+    const { hex } = oklchToHex(mid, c, h)
+    if (wcagContrast(hex, DARK_SURFACE) >= DARK_BUTTON_MIN_SURFACE_CONTRAST) {
+      minLForVisibility = mid
+      hi = mid
+    } else {
+      lo = mid
+    }
+  }
+
+  // Largest L (searching upward from the current lightness) that still
+  // keeps white text at or above its target — contrast vs. white falls
+  // monotonically as L increases.
+  lo = l
+  hi = 1
+  let maxLForText = l
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2
+    const { hex } = oklchToHex(mid, c, h)
+    if (wcagContrast(hex, '#ffffff') >= textTarget) {
+      maxLForText = mid
+      lo = mid
+    } else {
+      hi = mid
+    }
+  }
+
+  const targetL = Math.min(minLForVisibility, maxLForText)
+  if (targetL <= l) return candidate
+
+  const { hex: finalHex, finalC } = oklchToHex(targetL, c, h)
+  const reachedFloor = minLForVisibility <= maxLForText
+  const note = reachedFloor
+    ? `Lightened from ${Math.round(l * 100)}% to ${Math.round(targetL * 100)}% so the button stays visible (≥${DARK_BUTTON_MIN_SURFACE_CONTRAST}:1) against the dark surface, not just legible to its own text.`
+    : `Lightened from ${Math.round(l * 100)}% to ${Math.round(targetL * 100)}% (as far as possible without dropping white text below ${textTarget}:1) — still short of the ${DARK_BUTTON_MIN_SURFACE_CONTRAST}:1 dark-surface visibility floor.`
+
+  return {
+    hex: finalHex,
+    oklch: { l: targetL, c: finalC, h },
+    onColor: candidate.onColor,
+    notes: [...candidate.notes, note],
+  }
+}
+
 /**
  * Generate the background token for filled/primary buttons.
  *
@@ -464,56 +548,64 @@ function generateSoftTint(
  * lightness is nudged toward whichever direction (lighter, for black text,
  * or darker, for white text) reaches 4.5:1 with the smallest change from
  * the source — so the token stays as close as possible to the input color.
+ * A final pass (ensureDarkSurfaceVisibility) guards against a dark button
+ * blending into a dark page background.
  */
 function generateFilledToken(source: OklchColor, textTarget: number): TokenResult {
   const { hex: sourceHex } = oklchToHex(source.l, source.c, source.h)
   const contrastWithWhite = wcagContrast(sourceHex, '#ffffff')
   const contrastWithBlack = wcagContrast(sourceHex, '#000000')
 
+  let candidate: FilledCandidate
+
   if (contrastWithWhite >= textTarget || contrastWithBlack >= textTarget) {
     const onColor = contrastWithBlack >= contrastWithWhite ? '#000000' : '#ffffff'
     const contrastRatio = Math.max(contrastWithWhite, contrastWithBlack)
-    return {
-      tokenName: '--universe-accent-filled',
+    candidate = {
       hex: sourceHex,
       oklch: source,
-      contrastRatio,
-      contrastTarget: textTarget,
-      passes: true,
-      role: `Filled/primary button background — pairs with ${onColor === '#000000' ? 'black' : 'white'} text/icons`,
       onColor,
       notes: [
         `Source already supports ${onColor === '#000000' ? 'black' : 'white'} text at ${contrastRatio.toFixed(2)}:1. No adjustment required.`,
       ],
     }
+  } else {
+    // Lighten toward black-text territory, and separately darken toward
+    // white-text territory — then keep whichever needed the smaller nudge.
+    const lightened = adjustForContrast(source, '#000000', textTarget, 'dark')
+    const darkened = adjustForContrast(source, '#ffffff', textTarget, 'light')
+
+    const lightenDelta = Math.abs(lightened.oklch.l - source.l)
+    const darkenDelta = Math.abs(darkened.oklch.l - source.l)
+    const useLightened = lightenDelta <= darkenDelta
+
+    const chosen = useLightened ? lightened : darkened
+    const onColor = useLightened ? '#000000' : '#ffffff'
+
+    candidate = {
+      hex: chosen.hex,
+      oklch: chosen.oklch,
+      onColor,
+      notes: [
+        ...chosen.notes,
+        `Nudged ${useLightened ? 'lighter' : 'darker'} (closest viable direction) so ${onColor === '#000000' ? 'black' : 'white'} text/icons reach ${textTarget}:1.`,
+      ],
+    }
   }
 
-  // Lighten toward black-text territory, and separately darken toward
-  // white-text territory — then keep whichever needed the smaller nudge.
-  const lightened = adjustForContrast(source, '#000000', textTarget, 'dark')
-  const darkened = adjustForContrast(source, '#ffffff', textTarget, 'light')
-
-  const lightenDelta = Math.abs(lightened.oklch.l - source.l)
-  const darkenDelta = Math.abs(darkened.oklch.l - source.l)
-  const useLightened = lightenDelta <= darkenDelta
-
-  const chosen = useLightened ? lightened : darkened
-  const onColor = useLightened ? '#000000' : '#ffffff'
-  const contrastRatio = wcagContrast(chosen.hex, onColor)
+  const final = ensureDarkSurfaceVisibility(candidate, textTarget)
+  const contrastRatio = wcagContrast(final.hex, final.onColor)
 
   return {
     tokenName: '--universe-accent-filled',
-    hex: chosen.hex,
-    oklch: chosen.oklch,
+    hex: final.hex,
+    oklch: final.oklch,
     contrastRatio,
     contrastTarget: textTarget,
     passes: contrastRatio >= textTarget,
-    role: `Filled/primary button background — pairs with ${onColor === '#000000' ? 'black' : 'white'} text/icons`,
-    onColor,
-    notes: [
-      ...chosen.notes,
-      `Nudged ${useLightened ? 'lighter' : 'darker'} (closest viable direction) so ${onColor === '#000000' ? 'black' : 'white'} text/icons reach ${textTarget}:1.`,
-    ],
+    role: `Filled/primary button background — pairs with ${final.onColor === '#000000' ? 'black' : 'white'} text/icons`,
+    onColor: final.onColor,
+    notes: final.notes,
   }
 }
 
@@ -706,6 +798,49 @@ export function accessibleOnColor(bgHex: string): string {
   const whiteContrast = wcagContrast(bgHex, '#ffffff')
   const blackContrast = wcagContrast(bgHex, '#000000')
   return whiteContrast >= blackContrast ? '#ffffff' : '#000000'
+}
+
+// ─── Card Surface Token (image-derived) ─────────────────────────────────────
+
+export interface CardSurfaceToken {
+  /** Raw dominant hue extracted from the source image, unadjusted. */
+  sourceHex: string
+  sourceOklch: OklchColor
+  /** Accessibility-adjusted hex, safe as a background under fixed white text. */
+  hex: string
+  oklch: OklchColor
+  /** Contrast of `hex` against white (#ffffff), i.e. against the on-top text. */
+  contrastRatio: number
+  contrastTarget: number
+  passes: boolean
+  notes: string[]
+}
+
+/**
+ * Derive an accessible card-gradient surface color from a raw dominant hue
+ * (e.g. extracted from a Universe's key art). The color is treated as a
+ * background surface with fixed light (white) text/metadata on top — the
+ * inverse relationship of the light-mode accent token above, but the same
+ * underlying technique: darken (in OKLCH) via `adjustForContrast` until the
+ * fixed foreground color reaches the standard's text contrast target.
+ */
+export function deriveCardSurfaceToken(
+  dominantHex: string,
+  standard: ContrastStandard = DEFAULT_CONTRAST_STANDARD,
+): CardSurfaceToken {
+  const sourceOklch = hexToOklch(dominantHex)
+  const result = adjustForContrast(sourceOklch, '#ffffff', standard.textTarget, 'light')
+
+  return {
+    sourceHex: dominantHex,
+    sourceOklch,
+    hex: result.hex,
+    oklch: result.oklch,
+    contrastRatio: result.finalContrast,
+    contrastTarget: standard.textTarget,
+    passes: result.finalContrast >= standard.textTarget,
+    notes: result.notes,
+  }
 }
 
 /**

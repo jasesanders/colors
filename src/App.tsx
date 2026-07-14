@@ -3,6 +3,7 @@ import { CONTRAST_STANDARDS, generateTokens, sanitizeSourceHex, type ColorStyle 
 import ColorPickerSection from './components/ColorPickerSection'
 import TokenInspector from './components/TokenInspector'
 import AppPreview from './components/AppPreview'
+import CardColorSection from './components/CardColorSection'
 
 const DEFAULT_HEX = '#cc1520'
 
@@ -36,6 +37,11 @@ export default function App() {
 
         <div className="preview-panel">
           <AppPreview tokens={tokens} colorStyle={colorStyle} onColorStyleChange={setColorStyle} />
+          <CardColorSection
+            filledHex={tokens.filled.hex}
+            filledOnColor={tokens.filled.onColor ?? '#ffffff'}
+            standard={tokens.standard}
+          />
         </div>
       </main>
     </div>

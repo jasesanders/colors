@@ -38,7 +38,7 @@ function StandardToggle({
   )
 }
 
-function TokenRow({ token }: { token: TokenResult }) {
+export function TokenRow({ token }: { token: TokenResult }) {
   const passLabel =
     token.passes === null ? (
       <span className="badge badge--neutral">Surface</span>
