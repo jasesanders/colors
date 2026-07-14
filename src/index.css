@@ -111,7 +111,10 @@ pre {
   display: grid;
   grid-template-columns: 480px 1fr;
   gap: 32px;
-  align-items: start;
+  /* No align-items: start — cms-panel needs to stretch to match
+     preview-panel's height so the sticky color picker inside it has room
+     to stay pinned for the entire page scroll, not just its own content
+     height. */
 }
 
 @media (max-width: 1060px) {
@@ -124,14 +127,6 @@ pre {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  position: sticky;
-  top: 24px;
-}
-
-@media (max-width: 1060px) {
-  .cms-panel {
-    position: static;
-  }
 }
 
 /* ─── Shared section styles ──────────────────────────────────────── */
@@ -162,12 +157,24 @@ pre {
 
 /* ─── Color picker section ───────────────────────────────────────── */
 
+.color-picker-sentinel {
+  height: 1px;
+}
+
 .color-picker-section {
   background: var(--surface-0);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 24px;
   box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 24px;
+  z-index: 20;
+  transition: box-shadow 0.2s;
+}
+
+.color-picker-section--stuck {
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0,0,0,0.05);
 }
 
 .picker-row {
