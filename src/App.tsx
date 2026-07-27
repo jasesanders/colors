@@ -3,6 +3,7 @@ import { CONTRAST_STANDARDS, generateTokens, sanitizeSourceHex, type ColorStyle 
 import ColorPickerSection from './components/ColorPickerSection'
 import TokenInspector from './components/TokenInspector'
 import AppPreview from './components/AppPreview'
+import TitlePreview from './components/TitlePreview'
 import CardColorSection from './components/CardColorSection'
 import RulesReference from './components/RulesReference'
 
@@ -38,6 +39,12 @@ export default function App() {
 
         <div className="preview-panel">
           <AppPreview tokens={tokens} colorStyle={colorStyle} onColorStyleChange={setColorStyle} />
+          <TitlePreview
+            standard={tokens.standard}
+            filledHex={tokens.filled.hex}
+            filledOnColor={tokens.filled.onColor ?? '#ffffff'}
+            filledGradientCss={tokens.filled.gradient?.css}
+          />
           <CardColorSection
             filledHex={tokens.filled.hex}
             filledOnColor={tokens.filled.onColor ?? '#ffffff'}

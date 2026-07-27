@@ -1013,6 +1013,37 @@ export function deriveCardSurfaceToken(
 }
 
 /**
+ * Derive an accessible accent from a raw dominant hue for a *given* surface
+ * and theme, keeping the hue and shifting only lightness (chroma trimmed as
+ * needed to stay in gamut) until it clears the standard's text-contrast
+ * target. This is the two-directional generalization of
+ * {@link deriveCardSurfaceToken}: `mode='light'` darkens the hue toward a
+ * light surface, `mode='dark'` lightens it toward a dark one — the same split
+ * the Universe light/dark accent tokens use, applied to an image-derived hue.
+ */
+export function deriveAccentForSurface(
+  dominantHex: string,
+  standard: ContrastStandard,
+  mode: 'light' | 'dark',
+): CardSurfaceToken {
+  const surface = mode === 'light' ? LIGHT_SURFACE : DARK_SURFACE
+  const sourceOklch = hexToOklch(dominantHex)
+  const result = adjustForContrast(sourceOklch, surface, standard.textTarget, mode)
+  const contrastRatio = wcagContrast(result.hex, surface)
+
+  return {
+    sourceHex: dominantHex,
+    sourceOklch,
+    hex: result.hex,
+    oklch: result.oklch,
+    contrastRatio,
+    contrastTarget: standard.textTarget,
+    passes: contrastRatio >= standard.textTarget,
+    notes: result.notes,
+  }
+}
+
+/**
  * Color for accent-colored text/icons/borders that sit directly on a
  * surface (e.g. an outline button), rather than on a filled background.
  * The accent token is only guaranteed to meet the interactive (non-text UI)

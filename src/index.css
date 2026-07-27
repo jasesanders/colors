@@ -1054,6 +1054,333 @@ pre {
   box-shadow: var(--shadow-sm);
 }
 
+/* ─── Title page preview (image-derived accent) ──────────────────── */
+
+.title-preview-section {
+  margin-top: 32px;
+}
+
+.title-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title-phone {
+  width: 320px;
+  border-radius: 32px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+}
+
+.title-hero {
+  position: relative;
+  height: 320px;
+  flex-shrink: 0;
+}
+
+.title-hero__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.title-hero__scrim {
+  position: absolute;
+  inset: 0;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  transition: background-image 0.2s;
+}
+
+.title-hero__topbar {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title-chip {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: rgba(30, 30, 30, 0.45);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  cursor: pointer;
+}
+
+.title-chip--round {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  justify-content: center;
+}
+
+.title-chip--pill {
+  gap: 16px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 20px;
+}
+
+.title-hero__body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title-hero__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.title-hero__poster {
+  width: 62px;
+  height: 88px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.title-hero__headings {
+  padding-bottom: 2px;
+}
+
+.title-hero__brand {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.title-hero__name {
+  color: #ffffff;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin: 2px 0 3px;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.3);
+}
+
+.title-hero__meta {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.title-hero__nextrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-hero__nextcol {
+  flex: 1;
+  min-width: 0;
+}
+
+.title-hero__next {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  margin-bottom: 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.title-hero__next-label {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.title-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.title-progress__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #ffffff;
+}
+
+.title-hero__ep {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.title-update {
+  flex-shrink: 0;
+  border: none;
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 11px 22px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+  transition: filter 0.15s;
+}
+
+.title-update:hover {
+  filter: brightness(0.96);
+}
+
+.title-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid #ececec;
+}
+
+.title-tab {
+  flex: 1;
+  padding: 14px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  color: #8a8a8a;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+}
+
+.title-tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 16%;
+  right: 16%;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--title-tab-accent);
+}
+
+.title-content {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title-content__body {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.title-picker-row {
+  width: 320px;
+}
+
+/* Filled CTA variant — same treatment as a Universe page's Favorite button. */
+.title-update--filled {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+}
+
+/* Two phones (light + dark) side by side, wrapping on narrow widths. */
+.title-phones {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.title-phone-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Offscreen source image that drives dominant-hue extraction (not displayed). */
+.title-extract-src {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* CTA toggle switch */
+.title-cta-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.title-cta-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.title-cta-toggle__track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--border-medium);
+  transition: background 0.18s;
+  flex-shrink: 0;
+}
+
+.title-cta-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s;
+}
+
+.title-cta-toggle input:checked + .title-cta-toggle__track {
+  background: var(--text-primary);
+}
+
+.title-cta-toggle input:checked + .title-cta-toggle__track .title-cta-toggle__thumb {
+  transform: translateX(16px);
+}
+
+.title-cta-toggle input:focus-visible + .title-cta-toggle__track {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.title-cta-toggle__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 /* ─── Rules reference (footer) ───────────────────────────────────── */
 
 .app-footer {
