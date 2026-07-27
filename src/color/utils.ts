@@ -322,6 +322,88 @@ export function wcagContrast(hex1: string, hex2: string): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
+// ─── APCA Contrast (perceptual) ──────────────────────────────────────────────
+// WCAG 2.x contrast is a simple luminance ratio and is a known-poor predictor
+// of readability on saturated mid-tone colors — it tends to over-reward dark
+// text on vivid pinks/oranges/teals where most people find light text more
+// legible. APCA (the lightness-aware model drafted for WCAG 3) captures that
+// difference, so we use it to choose a filled button's text color. It is NOT
+// used for pass/fail here — the WCAG target the user selected still governs
+// the badges; APCA only decides which of black/white reads better.
+//
+// Implementation: the published APCA-W3 0.1.9 "SA98G" constants. Reference:
+// https://github.com/Myndex/apca-w3 and https://git.apcacontrast.com
+const APCA = {
+  trc: 2.4,
+  rco: 0.2126729,
+  gco: 0.7151522,
+  bco: 0.072175,
+  normBG: 0.56,
+  normTXT: 0.57,
+  revTXT: 0.62,
+  revBG: 0.65,
+  blkThrs: 0.022,
+  blkClmp: 1.414,
+  scale: 1.14,
+  loBoWoffset: 0.027,
+  loWoBoffset: 0.027,
+  deltaYmin: 0.0005,
+  loClip: 0.1,
+} as const
+
+/** APCA screen luminance (Ys) — a simple 2.4-power curve, not WCAG's piecewise linearization. */
+function apcaLuminance(hex: string): number {
+  const { r, g, b } = hexToRgb(hex)
+  return (
+    APCA.rco * Math.pow(r, APCA.trc) +
+    APCA.gco * Math.pow(g, APCA.trc) +
+    APCA.bco * Math.pow(b, APCA.trc)
+  )
+}
+
+/**
+ * APCA lightness contrast (Lc) of `textHex` over `bgHex`. Returns a signed
+ * value: positive for dark-text-on-light, negative for light-text-on-dark.
+ * Magnitude (|Lc|, ~0–108) is the readability score; compare magnitudes to
+ * decide which text color reads better.
+ */
+export function apcaContrast(textHex: string, bgHex: string): number {
+  let txtY = apcaLuminance(textHex)
+  let bgY = apcaLuminance(bgHex)
+
+  // Soft-clamp very dark colors toward black.
+  txtY = txtY > APCA.blkThrs ? txtY : txtY + Math.pow(APCA.blkThrs - txtY, APCA.blkClmp)
+  bgY = bgY > APCA.blkThrs ? bgY : bgY + Math.pow(APCA.blkThrs - bgY, APCA.blkClmp)
+
+  if (Math.abs(bgY - txtY) < APCA.deltaYmin) return 0
+
+  let sapc: number
+  let output: number
+  if (bgY > txtY) {
+    // Normal polarity: dark text on a lighter background.
+    sapc = (Math.pow(bgY, APCA.normBG) - Math.pow(txtY, APCA.normTXT)) * APCA.scale
+    output = sapc < APCA.loClip ? 0 : sapc - APCA.loBoWoffset
+  } else {
+    // Reverse polarity: light text on a darker background.
+    sapc = (Math.pow(bgY, APCA.revBG) - Math.pow(txtY, APCA.revTXT)) * APCA.scale
+    output = sapc > -APCA.loClip ? 0 : sapc + APCA.loWoBoffset
+  }
+  return output * 100
+}
+
+/**
+ * Pick black or white — whichever has the higher APCA lightness contrast (|Lc|)
+ * as text over `bgHex`. This is the perceptual counterpart to
+ * {@link accessibleOnColor}; on saturated mid-tone colors the two can disagree,
+ * and this is the one that tracks how legible the text actually looks. Ties
+ * (effectively never) resolve to white, matching accessibleOnColor.
+ */
+export function apcaOnColor(bgHex: string): string {
+  const whiteLc = Math.abs(apcaContrast('#ffffff', bgHex))
+  const blackLc = Math.abs(apcaContrast('#000000', bgHex))
+  return whiteLc >= blackLc ? '#ffffff' : '#000000'
+}
+
 // ─── Adjustment Engine ───────────────────────────────────────────────────────
 
 interface AdjustResult {
@@ -542,59 +624,68 @@ function ensureDarkSurfaceVisibility(
 /**
  * Generate the background token for filled/primary buttons.
  *
- * Unlike the surface-relative accent tokens, this token must work with a
- * fixed on-color (black or white) text/icon layer. If the source color
- * already lets black or white text reach 4.5:1, it's used as-is. Otherwise
- * lightness is nudged toward whichever direction (lighter, for black text,
- * or darker, for white text) reaches 4.5:1 with the smallest change from
- * the source — so the token stays as close as possible to the input color.
- * A final pass (ensureDarkSurfaceVisibility) guards against a dark button
- * blending into a dark page background.
+ * Text color is chosen *perceptually*, up front: whichever of black or white
+ * has the higher APCA lightness contrast against the source color wins (see
+ * apcaOnColor). This is what fixes the "black text on hot pink" problem —
+ * WCAG's luminance ratio prefers black there, but the color reads better with
+ * white, and APCA agrees.
+ *
+ * The button background is then nudged the minimal amount needed so that the
+ * APCA-chosen text color also clears the selected WCAG text target — darker
+ * for white text, lighter for black text (adjustForContrast returns the
+ * source untouched when it already passes). Choosing the color on the source
+ * and then nudging *into* that same polarity is stable: darkening only makes
+ * white more preferred, lightening only makes black more preferred, so the
+ * choice never needs revisiting. A final pass (ensureDarkSurfaceVisibility)
+ * keeps a dark, white-text button from vanishing into a near-black page.
+ *
+ * Net effect: the perceptually-better text color, but still WCAG-accessible —
+ * so the token's pass/fail badge stays honest under whichever standard the
+ * user picked.
  */
 function generateFilledToken(source: OklchColor, textTarget: number): TokenResult {
   const { hex: sourceHex } = oklchToHex(source.l, source.c, source.h)
-  const contrastWithWhite = wcagContrast(sourceHex, '#ffffff')
-  const contrastWithBlack = wcagContrast(sourceHex, '#000000')
 
-  let candidate: FilledCandidate
+  // 1. Perceptual pick, on the source color.
+  const onColor = apcaOnColor(sourceHex)
+  const onLabel = onColor === '#000000' ? 'black' : 'white'
+  const sourceApcaLc = Math.abs(apcaContrast(onColor, sourceHex))
+  const altColor = onColor === '#000000' ? '#ffffff' : '#000000'
+  const altApcaLc = Math.abs(apcaContrast(altColor, sourceHex))
 
-  if (contrastWithWhite >= textTarget || contrastWithBlack >= textTarget) {
-    const onColor = contrastWithBlack >= contrastWithWhite ? '#000000' : '#ffffff'
-    const contrastRatio = Math.max(contrastWithWhite, contrastWithBlack)
-    candidate = {
-      hex: sourceHex,
-      oklch: source,
-      onColor,
-      notes: [
-        `Source already supports ${onColor === '#000000' ? 'black' : 'white'} text at ${contrastRatio.toFixed(2)}:1. No adjustment required.`,
-      ],
-    }
+  // 2. Nudge the background so that chosen color also meets the WCAG target.
+  //    Contrast is symmetric, so "darken vs. white surface" == "make the
+  //    button dark enough for white text", and vice-versa for black.
+  const adjusted =
+    onColor === '#ffffff'
+      ? adjustForContrast(source, '#ffffff', textTarget, 'light')
+      : adjustForContrast(source, '#000000', textTarget, 'dark')
+
+  const wcagLc = wcagContrast(adjusted.hex, onColor)
+  const moved = adjusted.oklch.l !== source.l
+  const notes: string[] = [
+    `Text/icons set to ${onLabel} — the perceptually stronger choice by APCA (Lc ${sourceApcaLc.toFixed(0)} vs. ${altApcaLc.toFixed(0)} for ${onColor === '#000000' ? 'white' : 'black'}), even though WCAG's luminance ratio would lean the other way on saturated colors.`,
+  ]
+  if (moved) {
+    notes.push(...adjusted.notes)
+    notes.push(
+      `Nudged ${onColor === '#ffffff' ? 'darker' : 'lighter'} so ${onLabel} text/icons also clear the ${textTarget}:1 WCAG target (${wcagLc.toFixed(2)}:1).`,
+    )
   } else {
-    // Lighten toward black-text territory, and separately darken toward
-    // white-text territory — then keep whichever needed the smaller nudge.
-    const lightened = adjustForContrast(source, '#000000', textTarget, 'dark')
-    const darkened = adjustForContrast(source, '#ffffff', textTarget, 'light')
+    notes.push(
+      `Source already clears the ${textTarget}:1 WCAG target with ${onLabel} text (${wcagLc.toFixed(2)}:1) — no background adjustment required.`,
+    )
+  }
 
-    const lightenDelta = Math.abs(lightened.oklch.l - source.l)
-    const darkenDelta = Math.abs(darkened.oklch.l - source.l)
-    const useLightened = lightenDelta <= darkenDelta
-
-    const chosen = useLightened ? lightened : darkened
-    const onColor = useLightened ? '#000000' : '#ffffff'
-
-    candidate = {
-      hex: chosen.hex,
-      oklch: chosen.oklch,
-      onColor,
-      notes: [
-        ...chosen.notes,
-        `Nudged ${useLightened ? 'lighter' : 'darker'} (closest viable direction) so ${onColor === '#000000' ? 'black' : 'white'} text/icons reach ${textTarget}:1.`,
-      ],
-    }
+  const candidate: FilledCandidate = {
+    hex: adjusted.hex,
+    oklch: adjusted.oklch,
+    onColor,
+    notes,
   }
 
   const final = ensureDarkSurfaceVisibility(candidate, textTarget)
-  const contrastRatio = wcagContrast(final.hex, final.onColor)
+  const contrastRatio = wcagContrast(final.hex, onColor)
 
   return {
     tokenName: '--universe-accent-filled',
@@ -603,8 +694,8 @@ function generateFilledToken(source: OklchColor, textTarget: number): TokenResul
     contrastRatio,
     contrastTarget: textTarget,
     passes: contrastRatio >= textTarget,
-    role: `Filled/primary button background — pairs with ${final.onColor === '#000000' ? 'black' : 'white'} text/icons`,
-    onColor: final.onColor,
+    role: `Filled/primary button background — pairs with ${onLabel} text/icons`,
+    onColor,
     notes: final.notes,
   }
 }

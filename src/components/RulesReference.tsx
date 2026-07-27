@@ -134,9 +134,12 @@ export default function RulesReference() {
           tint rather than a loud block of color.
         </RuleRow>
         <RuleRow title="Filled / primary button" threshold={`≥ text target with solid black or white text`}>
-          Whichever of black or white text already works on the source color is used
-          as-is. If neither does, lightness is nudged toward whichever direction (lighter
-          for black text, darker for white text) needs the smaller change.
+          The text color is chosen perceptually: whichever of black or white has the
+          higher APCA contrast (a lightness-aware model that, unlike WCAG's luminance
+          ratio, doesn't over-favor black on saturated pinks, oranges, and teals) wins.
+          The button color is then nudged the minimum needed — darker for white text,
+          lighter for black — so that same choice still clears the selected WCAG target,
+          keeping the pass/fail badge honest.
         </RuleRow>
         <RuleRow
           title="Dark button visibility floor"

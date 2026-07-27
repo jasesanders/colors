@@ -18,10 +18,17 @@ gradient straight from a piece of key art. Both live-preview in the app.
    - **accent-content** — colored text, links, icons (≥4.5:1 at AA)
    - **accent-soft** — contextual background tint (no contrast requirement)
    - **filled** — shared filled/primary button background, guaranteed to
-     pair with accessible black or white text. It also carries a
-     visibility floor against a dark page surface, so a button dark enough
-     to pair with white text is nudged lighter just enough to stay visible
-     against `DARK_SURFACE` rather than blending into it.
+     pair with accessible black or white text. The text color is chosen
+     *perceptually* via [APCA](https://git.apcacontrast.com/) (the
+     lightness-aware model drafted for WCAG 3): whichever of black or white
+     has the higher APCA contrast wins, so saturated buttons (hot pink,
+     orange, teal) get the light text that actually reads better instead of
+     the dark text WCAG's luminance ratio would pick. The button color is
+     then nudged the minimum amount needed for that same text color to also
+     clear the selected WCAG target, so the pass/fail badge stays honest. It
+     also carries a visibility floor against a dark page surface, so a button
+     dark enough to pair with white text is nudged lighter just enough to
+     stay visible against `DARK_SURFACE` rather than blending into it.
 3. **Choose a standard** — WCAG AA, AAA, or an above-spec "AAA+" that pushes
    the non-text contrast floor further for buttons/controls.
 4. **Choose a style** — solid tokens, or a subtle gradient variant built
