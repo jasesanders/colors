@@ -1,13 +1,12 @@
 import {
   ACHROMATIC_CHROMA_EPSILON,
-  BUTTON_GRADIENT_SPREAD,
   CONTRAST_STANDARDS,
   DARK_BUTTON_MIN_SURFACE_CONTRAST,
   DARK_SURFACE,
   GRADIENT_ANGLE_DEG,
+  GRADIENT_LIGHTNESS_SPREAD,
   LIGHT_SURFACE,
   MIN_CARD_VS_BUTTON_CONTRAST,
-  SURFACE_GRADIENT_SPREAD,
 } from '../color/utils'
 import { CHROMA_MIN, HUE_BUCKETS, SAMPLE_SIZE } from '../color/cardImages'
 
@@ -167,12 +166,14 @@ export default function RulesReference() {
         </RuleRow>
         <RuleRow
           title="Gradient style"
-          threshold={`±${(BUTTON_GRADIENT_SPREAD * 100) / 2}% buttons · ±${(SURFACE_GRADIENT_SPREAD * 100) / 2}% surfaces`}
+          threshold={`±${(GRADIENT_LIGHTNESS_SPREAD * 100) / 2}% @ ${GRADIENT_ANGLE_DEG}°`}
         >
-          When gradient mode is on, each token gets a {GRADIENT_ANGLE_DEG}° lightness
-          spread centered on its own already-accessible color — a wider spread for
-          buttons/outlines, a subtler one for background surfaces. Colored text never
-          gets a gradient, so it stays flat and legible.
+          When gradient mode is on, each token gets a {GRADIENT_ANGLE_DEG}° diagonal
+          lightness spread centered on its own already-accessible color: the start stop
+          is {(GRADIENT_LIGHTNESS_SPREAD * 100) / 2}% darker and the end stop{' '}
+          {(GRADIENT_LIGHTNESS_SPREAD * 100) / 2}% lighter, so opposite corners of a
+          button differ by {GRADIENT_LIGHTNESS_SPREAD * 100}% lightness. Colored text
+          never gets a gradient, so it stays flat and legible.
         </RuleRow>
       </RuleGroup>
 

@@ -117,13 +117,16 @@ export const DEFAULT_CONTRAST_STANDARD = CONTRAST_STANDARDS.AA
 export const ACHROMATIC_CHROMA_EPSILON = 0.005
 export const NEAR_WHITE_FALLBACK = '#ededed'
 
-// Gradient stops are a lightness spread around a token's own (already
-// accessibility-adjusted) color, expressed as a fraction of the 0–1 OKLCH
-// lightness range. Kept subtle for surfaces, a bit bolder for buttons/
-// outlines, and unused entirely for text (see generateTokens).
-export const SURFACE_GRADIENT_SPREAD = 0.08
-export const BUTTON_GRADIENT_SPREAD = 0.2
-export const GRADIENT_ANGLE_DEG = 45
+// A gradient straddles its base color's OKLCH lightness by half this spread
+// on each side: the start stop is 5% darker, the end stop 5% lighter — a 10%
+// lightness change from one end to the other. Expressed as a fraction of the
+// 0–1 OKLCH lightness range, applied uniformly to every gradient-eligible
+// token; colored text never gets a gradient (see generateTokens).
+export const GRADIENT_LIGHTNESS_SPREAD = 0.1
+
+// Diagonal, so the lighter start and darker end land near opposite corners of
+// a rectangular-ish button rather than washing flatly top-to-bottom.
+export const GRADIENT_ANGLE_DEG = 120
 
 // ─── sRGB ↔ Linear ───────────────────────────────────────────────────────────
 
@@ -274,14 +277,17 @@ export function oklchToHex(
 }
 
 /**
- * Build a 45deg gradient centered on `oklch`, spreading lightness by
- * `spread` (a fraction of the 0–1 range) split evenly lighter/darker.
- * Hue and chroma are held constant; each stop is gamut-mapped independently.
+ * Build a diagonal gradient around a base OKLCH color: the start stop is
+ * half of GRADIENT_LIGHTNESS_SPREAD darker, the end stop the same amount
+ * lighter (a 10% total lightness change, corner to corner). At 120° that
+ * puts the darker end at the top-left and the lighter end at the
+ * bottom-right. Hue and chroma are held constant; each stop is gamut-mapped
+ * independently.
  */
-function buildGradient(oklch: OklchColor, spread: number): GradientStops {
-  const half = spread / 2
-  const { hex: from } = oklchToHex(clamp01(oklch.l + half), oklch.c, oklch.h)
-  const { hex: to } = oklchToHex(clamp01(oklch.l - half), oklch.c, oklch.h)
+function buildGradient(oklch: OklchColor): GradientStops {
+  const half = GRADIENT_LIGHTNESS_SPREAD / 2
+  const { hex: from } = oklchToHex(clamp01(oklch.l - half), oklch.c, oklch.h)
+  const { hex: to } = oklchToHex(clamp01(oklch.l + half), oklch.c, oklch.h)
   return { from, to, css: `linear-gradient(${GRADIENT_ANGLE_DEG}deg, ${from}, ${to})` }
 }
 
@@ -823,11 +829,11 @@ export function generateTokens(
   const filled = generateFilledToken(sourceOklch, textTarget)
 
   if (colorStyle === 'gradient') {
-    light.accent.gradient = buildGradient(light.accent.oklch, BUTTON_GRADIENT_SPREAD)
-    light.accentSoft.gradient = buildGradient(light.accentSoft.oklch, SURFACE_GRADIENT_SPREAD)
-    dark.accent.gradient = buildGradient(dark.accent.oklch, BUTTON_GRADIENT_SPREAD)
-    dark.accentSoft.gradient = buildGradient(dark.accentSoft.oklch, SURFACE_GRADIENT_SPREAD)
-    filled.gradient = buildGradient(filled.oklch, BUTTON_GRADIENT_SPREAD)
+    light.accent.gradient = buildGradient(light.accent.oklch)
+    light.accentSoft.gradient = buildGradient(light.accentSoft.oklch)
+    dark.accent.gradient = buildGradient(dark.accent.oklch)
+    dark.accentSoft.gradient = buildGradient(dark.accentSoft.oklch)
+    filled.gradient = buildGradient(filled.oklch)
     // accentContent (text/links) intentionally never gets a gradient.
   }
 
