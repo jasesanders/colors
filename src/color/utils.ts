@@ -126,7 +126,7 @@ export const GRADIENT_LIGHTNESS_SPREAD = 0.1
 
 // Diagonal, so the lighter start and darker end land near opposite corners of
 // a rectangular-ish button rather than washing flatly top-to-bottom.
-export const GRADIENT_ANGLE_DEG = 120
+export const GRADIENT_ANGLE_DEG = 140
 
 // ─── sRGB ↔ Linear ───────────────────────────────────────────────────────────
 
@@ -279,10 +279,10 @@ export function oklchToHex(
 /**
  * Build a diagonal gradient around a base OKLCH color: the start stop is
  * half of GRADIENT_LIGHTNESS_SPREAD darker, the end stop the same amount
- * lighter (a 10% total lightness change, corner to corner). At 120° that
- * puts the darker end at the top-left and the lighter end at the
- * bottom-right. Hue and chroma are held constant; each stop is gamut-mapped
- * independently.
+ * lighter (a 10% total lightness change, corner to corner). At
+ * GRADIENT_ANGLE_DEG that puts the darker end at the top-left and the
+ * lighter end at the bottom-right. Hue and chroma are held constant; each
+ * stop is gamut-mapped independently.
  */
 function buildGradient(oklch: OklchColor): GradientStops {
   const half = GRADIENT_LIGHTNESS_SPREAD / 2
