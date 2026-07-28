@@ -6,6 +6,7 @@ import { TokenRow } from './TokenInspector'
 interface Props {
   filledHex: string
   filledOnColor: string
+  filledGradientCss?: string
   standard: ContrastStandard
 }
 
@@ -14,7 +15,12 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${alpha})`
 }
 
-export default function CardColorSection({ filledHex, filledOnColor, standard }: Props) {
+export default function CardColorSection({
+  filledHex,
+  filledOnColor,
+  filledGradientCss,
+  standard,
+}: Props) {
   const [presetIndex, setPresetIndex] = useState(0)
   const [customSrc, setCustomSrc] = useState<string | null>(null)
   const [customLabel, setCustomLabel] = useState<string | null>(null)
@@ -128,7 +134,12 @@ export default function CardColorSection({ filledHex, filledOnColor, standard }:
               <p className="card-preview__desc">{activeGenre}</p>
               <button
                 className="card-preview__cta"
-                style={{ background: filledHex, color: filledOnColor }}
+                style={{
+                  color: filledOnColor,
+                  ...(filledGradientCss
+                    ? { backgroundImage: filledGradientCss }
+                    : { background: filledHex }),
+                }}
               >
                 Start
               </button>

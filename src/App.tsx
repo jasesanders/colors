@@ -48,6 +48,7 @@ export default function App() {
           <CardColorSection
             filledHex={tokens.filled.hex}
             filledOnColor={tokens.filled.onColor ?? '#ffffff'}
+            filledGradientCss={tokens.filled.gradient?.css}
             standard={tokens.standard}
           />
         </div>
