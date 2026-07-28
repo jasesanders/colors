@@ -11,7 +11,7 @@ const DEFAULT_HEX = '#cc1520'
 
 export default function App() {
   const [sourceHex, setSourceHex] = useState(DEFAULT_HEX)
-  const [standardId, setStandardId] = useState<keyof typeof CONTRAST_STANDARDS>('AA')
+  const [standardId, setStandardId] = useState<keyof typeof CONTRAST_STANDARDS>('AAA_PLUS')
   const [colorStyle, setColorStyle] = useState<ColorStyle>('solid')
   const tokens = generateTokens(sourceHex, CONTRAST_STANDARDS[standardId], colorStyle)
 
